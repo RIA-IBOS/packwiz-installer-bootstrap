@@ -20,7 +20,7 @@ import java.util.List;
 public class Bootstrap {
 
 	private static final String DEFAULT_UPDATE_URL = "https://api.github.com/repos/RIA-IBOS/packwiz-installer/releases/latest";
-	public static final String JAR_NAME = "packwiz-installer.jar";
+	public static final String JAR_NAME = BootstrapInfo.INSTALLER_JAR_NAME;
 
 	private static String updateURL = DEFAULT_UPDATE_URL;
 	private static boolean skipUpdate = false;
@@ -54,10 +54,10 @@ public class Bootstrap {
 			try {
 				LoadJAR.start(args, jarPath);
 			} catch (ClassNotFoundException e) {
-				showError(e, "packwiz-installer cannot be found, or there was an error loading it:");
+				showError(e, BootstrapInfo.INSTALLER_DISPLAY_NAME + " cannot be found, or there was an error loading it:");
 				System.exit(1);
 			} catch (Exception e) {
-				showError(e, "There was an error loading packwiz-installer:");
+				showError(e, "There was an error loading " + BootstrapInfo.INSTALLER_DISPLAY_NAME + ":");
 				System.exit(1);
 			}
 			return;
@@ -66,13 +66,13 @@ public class Bootstrap {
 		try {
 			doUpdate();
 		} catch (Exception e) {
-			showError(e, "There was an error downloading packwiz-installer:");
+			showError(e, "There was an error downloading " + BootstrapInfo.INSTALLER_DISPLAY_NAME + ":");
 		}
 
 		try {
 			LoadJAR.start(args, jarPath);
 		} catch (Exception e) {
-			showError(e, "There was an error loading packwiz-installer (did it download properly?):");
+			showError(e, "There was an error loading " + BootstrapInfo.INSTALLER_DISPLAY_NAME + " (did it download properly?):");
 			System.exit(1);
 		}
 	}
@@ -123,7 +123,7 @@ public class Bootstrap {
 			try {
 				EventQueue.invokeAndWait(() -> JOptionPane.showMessageDialog(null,
 					message + "\n" + e.getClass().getCanonicalName() + ": " + e.getMessage(),
-					"packwiz-installer-bootstrap", JOptionPane.ERROR_MESSAGE));
+					BootstrapInfo.DISPLAY_NAME, JOptionPane.ERROR_MESSAGE));
 			} catch (InterruptedException | InvocationTargetException ex) {
 				System.out.println("Unexpected interruption while showing error message");
 				ex.printStackTrace();
@@ -138,8 +138,8 @@ public class Bootstrap {
 		Options options = new Options();
 		options.addOption(null, "bootstrap-update-url", true, "Github API URL for checking for updates");
 		options.addOption(null, "bootstrap-update-token", true, "Github API Access Token, for private repositories");
-		options.addOption(null, "bootstrap-no-update", false, "Don't update packwiz-installer");
-		options.addOption(null, "bootstrap-main-jar", true, "Location of the packwiz-installer JAR file");
+		options.addOption(null, "bootstrap-no-update", false, "Don't update " + BootstrapInfo.INSTALLER_DISPLAY_NAME);
+		options.addOption(null, "bootstrap-main-jar", true, "Location of the " + BootstrapInfo.INSTALLER_DISPLAY_NAME + " JAR file");
 		options.addOption("g", "no-gui", false, "Don't display a GUI to show update progress");
 		options.addOption("h", "help", false, "Display this message");
 
@@ -154,9 +154,9 @@ public class Bootstrap {
 			HelpFormatter formatter = new HelpFormatter();
 			// Add options from packwiz-installer JAR, if it is present
 			boolean jarLoaded = LoadJAR.addOptions(options, jarPath);
-			formatter.printHelp("java -jar packwiz-installer-bootstrap.jar", options);
+			formatter.printHelp("java -jar " + BootstrapInfo.BOOTSTRAP_JAR_NAME, BootstrapInfo.DISPLAY_NAME, options, null, true);
 			if (!jarLoaded) {
-				System.out.println("Options for packwiz-installer will be visible once it has been downloaded.");
+				System.out.println("Options for " + BootstrapInfo.INSTALLER_DISPLAY_NAME + " will be visible once it has been downloaded.");
 			}
 			System.exit(0);
 		}
@@ -230,7 +230,7 @@ public class Bootstrap {
 		conn.setReadTimeout(30 * 1000);
 		InputStream in;
 		if (useGUI) {
-			in = new ConnMonitorInputStream(conn, "Checking for packwiz-installer updates...", null);
+			in = new ConnMonitorInputStream(conn, "Checking for " + BootstrapInfo.INSTALLER_DISPLAY_NAME + " updates...", null);
 		} else {
 			in = conn.getInputStream();
 		}
@@ -295,7 +295,7 @@ public class Bootstrap {
 		conn.setReadTimeout(30 * 1000);
 		InputStream in;
 		if (useGUI) {
-			in = new ConnMonitorInputStream(conn, "Updating packwiz-installer...", null);
+			in = new ConnMonitorInputStream(conn, "Updating " + BootstrapInfo.INSTALLER_DISPLAY_NAME + "...", null);
 		} else {
 			in = conn.getInputStream();
 		}
