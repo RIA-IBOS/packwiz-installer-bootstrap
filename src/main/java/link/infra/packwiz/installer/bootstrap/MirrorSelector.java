@@ -27,7 +27,8 @@ public class MirrorSelector {
 	};
 
 	private static final int TIMEOUT_MS = 5000; // 5秒超时
-	private static final int TEST_TIMEOUT_MS = 3000; // 测速超时3秒
+	private static final int TEST_TIMEOUT_MS = 5000; // 测速超时5秒
+	private static final int TEST_DOWNLOAD_SIZE = 256 * 1024; // 测试下载256KB数据
 
 	/**
 	 * Generates all possible mirror URLs for a given GitHub release asset
@@ -58,37 +59,72 @@ public class MirrorSelector {
 	}
 
 	/**
-	 * Tests the response time of a URL
+	 * Tests the download speed of a URL by downloading a small portion
 	 * @param urlString URL to test
-	 * @return Response time in milliseconds, or Long.MAX_VALUE if failed
+	 * @return Download speed in bytes per second, or 0 if failed
 	 */
 	private static long testUrl(String urlString) {
 		HttpURLConnection conn = null;
+		java.io.InputStream in = null;
 		try {
-			long startTime = System.currentTimeMillis();
 			URL url = new URL(urlString);
 			conn = (HttpURLConnection) url.openConnection();
-			conn.setRequestMethod("HEAD");
+			conn.setRequestMethod("GET");
 			conn.setConnectTimeout(TEST_TIMEOUT_MS);
 			conn.setReadTimeout(TEST_TIMEOUT_MS);
 			conn.setInstanceFollowRedirects(true);
+			// 请求前 256KB 数据
+			conn.setRequestProperty("Range", "bytes=0-" + (TEST_DOWNLOAD_SIZE - 1));
 
 			int responseCode = conn.getResponseCode();
-			long responseTime = System.currentTimeMillis() - startTime;
 
-			if (responseCode == HttpURLConnection.HTTP_OK ||
-			    responseCode == HttpURLConnection.HTTP_MOVED_TEMP ||
-			    responseCode == HttpURLConnection.HTTP_MOVED_PERM) {
-				System.out.println("Mirror test: " + urlString + " - " + responseTime + "ms");
-				return responseTime;
-			} else {
+			// 206 是 Partial Content，200 是完整内容
+			if (responseCode != HttpURLConnection.HTTP_PARTIAL &&
+			    responseCode != HttpURLConnection.HTTP_OK) {
 				System.out.println("Mirror test: " + urlString + " - Failed (HTTP " + responseCode + ")");
-				return Long.MAX_VALUE;
+				return 0;
 			}
+
+			in = conn.getInputStream();
+			byte[] buffer = new byte[8192];
+			long totalBytes = 0;
+			long startTime = System.currentTimeMillis();
+			int bytesRead;
+
+			// 下载数据并计算速度
+			while (totalBytes < TEST_DOWNLOAD_SIZE && (bytesRead = in.read(buffer)) != -1) {
+				totalBytes += bytesRead;
+			}
+
+			long elapsedTime = System.currentTimeMillis() - startTime;
+
+			if (elapsedTime == 0) {
+				elapsedTime = 1; // 避免除以零
+			}
+
+			// 计算速度：字节/秒
+			long speed = (totalBytes * 1000) / elapsedTime;
+
+			// 转换为 KB/s 或 MB/s 显示
+			String speedStr;
+			if (speed > 1024 * 1024) {
+				speedStr = String.format("%.2f MB/s", speed / (1024.0 * 1024.0));
+			} else {
+				speedStr = String.format("%.2f KB/s", speed / 1024.0);
+			}
+
+			System.out.println("Mirror test: " + urlString + " - " + speedStr);
+			return speed;
+
 		} catch (IOException e) {
 			System.out.println("Mirror test: " + urlString + " - Failed (" + e.getMessage() + ")");
-			return Long.MAX_VALUE;
+			return 0;
 		} finally {
+			if (in != null) {
+				try {
+					in.close();
+				} catch (IOException ignored) {}
+			}
 			if (conn != null) {
 				conn.disconnect();
 			}
@@ -123,7 +159,7 @@ public class MirrorSelector {
 		List<MirrorResult> results = new ArrayList<>();
 		for (Future<MirrorResult> future : futures) {
 			try {
-				results.add(future.get(TEST_TIMEOUT_MS + 1000, TimeUnit.MILLISECONDS));
+				results.add(future.get(TEST_TIMEOUT_MS + 2000, TimeUnit.MILLISECONDS));
 			} catch (InterruptedException | ExecutionException | TimeoutException e) {
 				// 忽略失败的测试
 			}
@@ -131,7 +167,7 @@ public class MirrorSelector {
 
 		executor.shutdown();
 
-		// 找到最快的镜像
+		// 找到速度最快的镜像
 		if (results.isEmpty()) {
 			System.out.println("All mirror tests failed, using first URL: " + urls.get(0));
 			return urls.get(0);
@@ -140,12 +176,20 @@ public class MirrorSelector {
 		Collections.sort(results);
 		MirrorResult fastest = results.get(0);
 
-		if (fastest.responseTime == Long.MAX_VALUE) {
+		if (fastest.speed == 0) {
 			System.out.println("All mirrors failed, using first URL: " + urls.get(0));
 			return urls.get(0);
 		}
 
-		System.out.println("Selected fastest mirror: " + fastest.url + " (" + fastest.responseTime + "ms)");
+		// 转换速度显示
+		String speedStr;
+		if (fastest.speed > 1024 * 1024) {
+			speedStr = String.format("%.2f MB/s", fastest.speed / (1024.0 * 1024.0));
+		} else {
+			speedStr = String.format("%.2f KB/s", fastest.speed / 1024.0);
+		}
+
+		System.out.println("Selected fastest mirror: " + fastest.url + " (" + speedStr + ")");
 		return fastest.url;
 	}
 
@@ -154,16 +198,17 @@ public class MirrorSelector {
 	 */
 	private static class MirrorResult implements Comparable<MirrorResult> {
 		final String url;
-		final long responseTime;
+		final long speed; // bytes per second
 
-		MirrorResult(String url, long responseTime) {
+		MirrorResult(String url, long speed) {
 			this.url = url;
-			this.responseTime = responseTime;
+			this.speed = speed;
 		}
 
 		@Override
 		public int compareTo(MirrorResult other) {
-			return Long.compare(this.responseTime, other.responseTime);
+			// 速度越大越好，所以反向排序
+			return Long.compare(other.speed, this.speed);
 		}
 	}
 }
