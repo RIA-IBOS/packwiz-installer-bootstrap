@@ -26,6 +26,18 @@ application {
 
 jar {
     manifest {
-        attributes('Main-Class': 'link.infra.packwiz.installer.bootstrap.Main')
+        attributes(
+            'Main-Class': 'link.infra.packwiz.installer.bootstrap.Main',
+            'Premain-Class': 'link.infra.packwiz.installer.bootstrap.BootstrapAgent'
+        )
+    }
+}
+
+shadowJar {
+    manifest {
+        attributes(
+            'Main-Class': 'link.infra.packwiz.installer.bootstrap.Main',
+            'Premain-Class': 'link.infra.packwiz.installer.bootstrap.BootstrapAgent'
+        )
     }
 }
