@@ -80,7 +80,7 @@ public class Bootstrap {
 	private static void doUpdate() throws IOException, GithubException {
 		String currVersion = LoadJAR.getVersion(jarPath);
 		Release ghRelease = requestRelease();
-		
+
 		if (ghRelease == null) {
 			return;
 		}
@@ -92,7 +92,11 @@ public class Bootstrap {
 			RollbackHandler backup = new RollbackHandler(jarPath);
 
 			try {
-				downloadUpdate(ghRelease.downloadURL, ghRelease.assetURL, jarPath);
+				// 生成所有镜像 URL 并选择最快的
+				List<String> mirrorUrls = MirrorSelector.generateMirrorUrls(ghRelease.downloadURL);
+				String fastestUrl = MirrorSelector.selectFastestMirror(mirrorUrls);
+
+				downloadUpdate(fastestUrl, ghRelease.assetURL, jarPath);
 			} catch (InterruptedIOException e) {
 				// User did this, don't show the error
 				try {
